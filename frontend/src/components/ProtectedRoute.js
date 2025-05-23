@@ -10,7 +10,12 @@ function ProtectedRoute({ children, userType }) {
   }
 
   if (userType && currentUserType !== userType) {
-    return <Navigate to="/" />
+    // If specific user type is required and doesn't match
+    if (userType === "admin") {
+      return <Navigate to="/employeehome" />
+    } else {
+      return <Navigate to="/admindashboard" />
+    }
   }
 
   return children

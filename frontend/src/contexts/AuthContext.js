@@ -18,10 +18,12 @@ export function AuthProvider({ children }) {
 
   async function signup(email, password, type, name) {
     try {
+      console.log("Creating user account...")
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // Create user document with proper role
+      console.log("User created, setting up document...")
+      // Create user document
       await setDoc(doc(db, "users", user.uid), {
         email: email,
         userType: type,
@@ -29,12 +31,7 @@ export function AuthProvider({ children }) {
         createdAt: new Date().toISOString(),
       })
 
-      // If this is an admin account, redirect to admin setup
-      if (type === "admin") {
-        // We'll handle admin setup in a separate component
-        return { ...userCredential, isNewAdmin: true }
-      }
-
+      console.log("User document created successfully")
       return userCredential
     } catch (error) {
       console.error("Signup error:", error)
@@ -44,7 +41,9 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     try {
+      console.log("Logging in user...")
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      console.log("Login successful")
       return userCredential
     } catch (error) {
       console.error("Login error:", error)
@@ -58,11 +57,27 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed:", user ? "User logged in" : "User logged out")
+
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid))
-        if (userDoc.exists()) {
+        try {
+          console.log("Fetching user document for:", user.uid)
+          const userDoc = await getDoc(doc(db, "users", user.uid))
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            console.log("User data retrieved:", userData)
+            setCurrentUser(user)
+            setUserType(userData.userType)
+          } else {
+            console.log("User document doesn't exist")
+            setCurrentUser(user)
+            setUserType(null)
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error)
           setCurrentUser(user)
-          setUserType(userDoc.data().userType)
+          setUserType(null)
         }
       } else {
         setCurrentUser(null)

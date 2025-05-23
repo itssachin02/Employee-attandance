@@ -36,21 +36,31 @@ function AuthPage() {
 
     try {
       if (isLogin) {
+        console.log("Attempting login...")
         const userCredential = await login(formData.email, formData.password)
+
+        console.log("Login successful, checking user type...")
         const userDoc = await getDoc(doc(db, "users", userCredential.user.uid))
 
         if (userDoc.exists()) {
           const userData = userDoc.data()
+          console.log("User type:", userData.userType)
+
           if (userData.userType === "admin") {
-            // For admins, first go to setup to ensure permissions
-            navigate("/admin-setup")
+            navigate("/admindashboard")
           } else {
             navigate("/employeehome")
           }
+        } else {
+          console.log("User document not found, redirecting to home")
+          navigate("/")
         }
       } else {
+        console.log("Attempting signup...")
+
         if (userType === "employee") {
           // Check if employee email exists in employees collection
+          console.log("Checking if employee email exists...")
           const employeesQuery = query(collection(db, "employees"), where("email", "==", formData.email))
           const employeeSnapshot = await getDocs(employeesQuery)
 
@@ -62,20 +72,31 @@ function AuthPage() {
         }
 
         const result = await signup(formData.email, formData.password, userType, formData.name)
+        console.log("Signup successful")
 
         if (userType === "admin") {
-          // New admins go through setup
-          navigate("/admin-setup")
+          navigate("/admindashboard")
         } else {
           navigate("/employeehome")
         }
       }
     } catch (error) {
       console.error("Auth error:", error)
+
       if (error.code === "permission-denied") {
-        setError("Firebase permission denied. Please check your security rules.")
+        setError("Firebase permission denied. Please check your security rules in Firebase Console.")
+      } else if (error.code === "auth/user-not-found") {
+        setError("No account found with this email address.")
+      } else if (error.code === "auth/wrong-password") {
+        setError("Incorrect password.")
+      } else if (error.code === "auth/email-already-in-use") {
+        setError("An account with this email already exists.")
+      } else if (error.code === "auth/weak-password") {
+        setError("Password should be at least 6 characters.")
+      } else if (error.code === "auth/invalid-email") {
+        setError("Invalid email address.")
       } else {
-        setError(error.message)
+        setError(`Error: ${error.message}`)
       }
     }
     setLoading(false)
@@ -91,7 +112,19 @@ function AuthPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mt-4">{error}</div>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mt-4">
+              {error}
+              {error.includes("permission denied") && (
+                <div className="mt-2 text-sm">
+                  <p>To fix this:</p>
+                  <ol className="list-decimal pl-4 mt-1">
+                    <li>Go to Firebase Console</li>
+                    <li>Navigate to Firestore Database → Rules</li>
+                    <li>Use the permissive rules from the setup guide</li>
+                  </ol>
+                </div>
+              )}
+            </div>
           )}
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

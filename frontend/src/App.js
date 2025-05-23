@@ -5,7 +5,9 @@ import AuthPage from "./components/AuthPage"
 import AdminDashboard from "./components/AdminDashboard"
 import AddEmployee from "./components/AddEmployee"
 import EmployeeHome from "./components/EmployeeHome"
+import CalendarView from "./components/CalendarView"
 import ProtectedRoute from "./components/ProtectedRoute"
+import AdminSetup from "./components/AdminSetup"
 
 function App() {
   return (
@@ -15,6 +17,14 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/admin-setup"
+              element={
+                <ProtectedRoute>
+                  <AdminSetup />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/admindashboard"
               element={
@@ -36,6 +46,14 @@ function App() {
               element={
                 <ProtectedRoute userType="employee">
                   <EmployeeHome />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar/:employeeId"
+              element={
+                <ProtectedRoute>
+                  <CalendarView />
                 </ProtectedRoute>
               }
             />
