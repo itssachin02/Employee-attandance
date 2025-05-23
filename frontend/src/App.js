@@ -1,29 +1,49 @@
-// src/App.js
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Toaster } from "sonner"; 
-import Home from "./components/Home";
-
-
-// Components
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
+import { AuthProvider } from "./contexts/AuthContext"
+import HomePage from "./components/HomePage"
+import AuthPage from "./components/AuthPage"
+import AdminDashboard from "./components/AdminDashboard"
+import AddEmployee from "./components/AddEmployee"
+import EmployeeHome from "./components/EmployeeHome"
+import ProtectedRoute from "./components/ProtectedRoute"
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-
-
-        
-        
-
-
-      </Routes>
-      
-      <Toaster richColors position="top-right" />
-
-    </Router>
-  );
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-50">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/admindashboard"
+              element={
+                <ProtectedRoute userType="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/addemployee"
+              element={
+                <ProtectedRoute userType="admin">
+                  <AddEmployee />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employeehome"
+              element={
+                <ProtectedRoute userType="employee">
+                  <EmployeeHome />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
+  )
 }
 
-export default App;
+export default App
