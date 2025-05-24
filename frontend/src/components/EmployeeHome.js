@@ -72,14 +72,12 @@ function EmployeeHome() {
   const checkTodayAttendance = async () => {
     if (currentUser) {
       try {
-        // Check if user document has today's attendance
         const userDoc = await getDoc(doc(db, "users", currentUser.uid))
         if (userDoc.exists()) {
           const userData = userDoc.data()
           const attendanceData = userData.attendance || {}
 
-          // Check if today's attendance exists
-          if (attendanceData[todayDate] && attendanceData[todayDate].presentornot) {
+          if (attendanceData[todayDate] && attendanceData[todayDate].presentornot === true) {
             setAttendanceMarked(true)
           }
         }
@@ -116,7 +114,6 @@ function EmployeeHome() {
 
   const startCamera = async () => {
     try {
-      // First try to get location
       try {
         const locationData = await getLocation()
         setLocation(locationData)
@@ -126,7 +123,6 @@ function EmployeeHome() {
         setMessage(`Location error: ${locationError.message}. Proceeding without location.`)
       }
 
-      // Then try to access camera
       setCameraError("")
       const constraints = {
         video: {
@@ -161,7 +157,6 @@ function EmployeeHome() {
 
   const startUpload = async () => {
     try {
-      // Get location for upload option too
       try {
         const locationData = await getLocation()
         setLocation(locationData)
@@ -186,7 +181,7 @@ function EmployeeHome() {
         const reader = new FileReader()
         reader.onload = (e) => {
           setUploadedImage(e.target.result)
-          setCapturedImage(e.target.result) // Use the same state for consistency
+          setCapturedImage(e.target.result)
         }
         reader.readAsDataURL(file)
       } else {
@@ -238,6 +233,34 @@ function EmployeeHome() {
     startUpload()
   }
 
+  // Helper function to create a clean, Firestore-compatible object
+  const createCleanAttendanceRecord = (imageData, locationData) => {
+    const now = new Date()
+
+    // Create a clean location object
+    const cleanLocation = locationData
+      ? {
+          latitude: Number(locationData.latitude) || 0,
+          longitude: Number(locationData.longitude) || 0,
+          accuracy: Number(locationData.accuracy) || 0,
+        }
+      : {
+          latitude: 0,
+          longitude: 0,
+          note: "Location not available",
+        }
+
+    // Create the attendance record with only primitive types and simple objects
+    return {
+      date: todayDate,
+      time: now.toLocaleTimeString(),
+      presentornot: true,
+      location: cleanLocation,
+      image: imageData || "",
+      timestamp: now.toISOString(),
+    }
+  }
+
   const submitAttendance = async () => {
     if (!capturedImage) {
       setMessage("Please capture a photo or upload an image before submitting.")
@@ -259,22 +282,19 @@ function EmployeeHome() {
 
       await signInWithEmailAndPassword(auth, currentUser.email, password)
 
-      const now = new Date()
-      const attendanceRecord = {
-        date: todayDate,
-        time: now.toLocaleTimeString(),
-        presentornot: true,
-        location: location || { note: "Location not available" },
-        image: capturedImage,
-        timestamp: now.toISOString(),
-      }
+      // Create a clean attendance record
+      const attendanceRecord = createCleanAttendanceRecord(capturedImage, location)
 
-      // Update user document with attendance data
+      console.log("Clean attendance record:", attendanceRecord)
+
+      // Get current user document
       const userRef = doc(db, "users", currentUser.uid)
       const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
         const userData = userDoc.data()
+
+        // Get existing attendance or create new object
         const currentAttendance = userData.attendance || {}
 
         // Add today's attendance
@@ -293,16 +313,16 @@ function EmployeeHome() {
           }
         })
 
-        // Update user document
+        // Update user document with clean data
         await updateDoc(userRef, {
           attendance: filteredAttendance,
-          lastAttendanceUpdate: now.toISOString(),
+          lastAttendanceUpdate: attendanceRecord.timestamp,
         })
 
         console.log("Attendance saved successfully to user document")
       } else {
         // Create user document if it doesn't exist
-        await setDoc(userRef, {
+        const newUserData = {
           email: currentUser.email,
           name: employeeName,
           userType: "employee",
@@ -310,21 +330,26 @@ function EmployeeHome() {
           attendance: {
             [todayDate]: attendanceRecord,
           },
-          lastAttendanceUpdate: now.toISOString(),
-        })
+          lastAttendanceUpdate: attendanceRecord.timestamp,
+        }
+
+        await setDoc(userRef, newUserData)
+        console.log("New user document created with attendance")
       }
 
-      // Also save to attendance collection for admin dashboard
-      await addDoc(collection(db, "attendance"), {
+      // Also save to attendance collection for admin dashboard (with clean data)
+      const attendanceCollectionRecord = {
         employeeId: currentUser.uid,
         employeeName: employeeName,
         date: todayDate,
-        time: now.toLocaleTimeString(),
-        timestamp: now.toISOString(),
+        time: attendanceRecord.time,
+        timestamp: attendanceRecord.timestamp,
         photo: capturedImage,
         presentornot: true,
-        location: location || { note: "Location not available" },
-      })
+        location: attendanceRecord.location,
+      }
+
+      await addDoc(collection(db, "attendance"), attendanceCollectionRecord)
 
       setAttendanceMarked(true)
       setCapturedImage(null)
@@ -335,8 +360,14 @@ function EmployeeHome() {
       console.log("Attendance record saved:", attendanceRecord)
     } catch (error) {
       console.error("Error marking attendance:", error)
+
+      // More specific error handling
       if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
         setMessage("Invalid password. Please try again.")
+      } else if (error.code === "permission-denied") {
+        setMessage("Permission denied. Please check your Firebase security rules.")
+      } else if (error.message && error.message.includes("nested entity")) {
+        setMessage("Data format error. Please try again or contact support.")
       } else {
         setMessage("Error marking attendance: " + error.message)
       }
@@ -398,7 +429,7 @@ function EmployeeHome() {
           {message && (
             <div
               className={`mb-4 p-3 rounded-md ${
-                message.includes("Error") || message.includes("Invalid")
+                message.includes("Error") || message.includes("Invalid") || message.includes("Permission")
                   ? "bg-red-50 text-red-700 border border-red-200"
                   : "bg-green-50 text-green-700 border border-green-200"
               }`}
@@ -596,3 +627,4 @@ function EmployeeHome() {
 }
 
 export default EmployeeHome
+
