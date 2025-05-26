@@ -58,6 +58,13 @@ function AuthPage() {
       } else {
         console.log("Attempting signup...")
 
+        // SECURITY: Restrict admin account creation to specific email only
+        if (userType === "admin" && formData.email !== "sachingupta232025@gmail.com") {
+          setError("Admin account creation is restricted. Only authorized personnel can create admin accounts.")
+          setLoading(false)
+          return
+        }
+
         if (userType === "employee") {
           // Check if employee email exists in employees collection
           console.log("Checking if employee email exists...")
@@ -153,6 +160,14 @@ function AuthPage() {
                     Employee
                   </label>
                 </div>
+              </div>
+            )}
+
+            {!isLogin && userType === "admin" && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md">
+                <p className="text-sm">
+                  <strong>Note:</strong> Admin account creation is restricted to authorized personnel only.
+                </p>
               </div>
             )}
 
