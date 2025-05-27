@@ -29,6 +29,7 @@ function EmployeeHome() {
   const [capturedImage, setCapturedImage] = useState(null)
   const [uploadedImage, setUploadedImage] = useState(null)
   const [location, setLocation] = useState(null)
+  const [locationAddress, setLocationAddress] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [cameraError, setCameraError] = useState("")
@@ -87,6 +88,61 @@ function EmployeeHome() {
     }
   }
 
+  // Function to convert coordinates to readable address
+  const getAddressFromCoordinates = async (latitude, longitude) => {
+    try {
+      // Using OpenStreetMap Nominatim API (free, no API key required)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data && data.display_name) {
+          // Extract meaningful parts of the address
+          const address = data.address || {}
+
+          // Build a readable address string
+          const addressParts = []
+
+          if (address.house_number && address.road) {
+            addressParts.push(`${address.house_number} ${address.road}`)
+          } else if (address.road) {
+            addressParts.push(address.road)
+          }
+
+          if (address.neighbourhood || address.suburb) {
+            addressParts.push(address.neighbourhood || address.suburb)
+          }
+
+          if (address.city || address.town || address.village) {
+            addressParts.push(address.city || address.town || address.village)
+          }
+
+          if (address.state) {
+            addressParts.push(address.state)
+          }
+
+          // If we have address parts, join them
+          if (addressParts.length > 0) {
+            return addressParts.join(", ")
+          }
+
+          // Fallback to display_name if no specific parts found
+          return data.display_name
+        }
+      }
+
+      // Fallback if API fails
+      return `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+    } catch (error) {
+      console.error("Error getting address:", error)
+      // Fallback to coordinates if address lookup fails
+      return `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+    }
+  }
+
   const getLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -95,12 +151,17 @@ function EmployeeHome() {
       }
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const locationData = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
           }
+
+          // Get readable address from coordinates
+          const address = await getAddressFromCoordinates(locationData.latitude, locationData.longitude)
+          setLocationAddress(address)
+
           resolve(locationData)
         },
         (error) => {
@@ -118,6 +179,7 @@ function EmployeeHome() {
         const locationData = await getLocation()
         setLocation(locationData)
         console.log("Location obtained:", locationData)
+        console.log("Address:", locationAddress)
       } catch (locationError) {
         console.error("Location error:", locationError)
         setMessage(`Location error: ${locationError.message}. Proceeding without location.`)
@@ -161,6 +223,7 @@ function EmployeeHome() {
         const locationData = await getLocation()
         setLocation(locationData)
         console.log("Location obtained:", locationData)
+        console.log("Address:", locationAddress)
       } catch (locationError) {
         console.error("Location error:", locationError)
         setMessage(`Location error: ${locationError.message}. Proceeding without location.`)
@@ -234,21 +297,22 @@ function EmployeeHome() {
   }
 
   // Helper function to create a clean, Firestore-compatible object
-  const createCleanAttendanceRecord = (imageData, locationData) => {
+  const createCleanAttendanceRecord = (imageData, locationData, address) => {
     const now = new Date()
 
-    // Create a clean location object
-    const cleanLocation = locationData
-      ? {
-          latitude: Number(locationData.latitude) || 0,
-          longitude: Number(locationData.longitude) || 0,
-          accuracy: Number(locationData.accuracy) || 0,
-        }
-      : {
-          latitude: 0,
-          longitude: 0,
-          note: "Location not available",
-        }
+    // Create a clean location object with readable address
+    const cleanLocation =
+      locationData && address
+        ? {
+            address: address,
+            coordinates: `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`,
+            accuracy: Number(locationData.accuracy) || 0,
+          }
+        : {
+            address: "Location not available",
+            coordinates: "0, 0",
+            accuracy: 0,
+          }
 
     // Create the attendance record with only primitive types and simple objects
     return {
@@ -282,8 +346,8 @@ function EmployeeHome() {
 
       await signInWithEmailAndPassword(auth, currentUser.email, password)
 
-      // Create a clean attendance record
-      const attendanceRecord = createCleanAttendanceRecord(capturedImage, location)
+      // Create a clean attendance record with readable address
+      const attendanceRecord = createCleanAttendanceRecord(capturedImage, location, locationAddress)
 
       console.log("Clean attendance record:", attendanceRecord)
 
@@ -355,6 +419,7 @@ function EmployeeHome() {
       setCapturedImage(null)
       setUploadedImage(null)
       setPassword("")
+      setLocationAddress("")
       setMessage("Attendance marked successfully!")
 
       console.log("Attendance record saved:", attendanceRecord)
@@ -443,6 +508,19 @@ function EmployeeHome() {
               <p className="font-medium">Camera Error:</p>
               <p>{cameraError}</p>
               <p className="mt-2 text-sm">Please ensure you've granted camera permissions in your browser settings.</p>
+            </div>
+          )}
+
+          {/* Location Display */}
+          {locationAddress && (
+            <div className="mb-4 p-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+              <div className="flex items-center">
+                <MapPin className="h-5 w-5 mr-2" />
+                <div>
+                  <p className="font-medium">Current Location:</p>
+                  <p className="text-sm">{locationAddress}</p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -627,4 +705,3 @@ function EmployeeHome() {
 }
 
 export default EmployeeHome
-
