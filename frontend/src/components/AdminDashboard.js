@@ -94,6 +94,30 @@ function AdminDashboard() {
     navigate(`/calendar/${employeeId}`)
   }
 
+  // Helper function to get readable location text
+  const getLocationDisplay = (locationData) => {
+    if (!locationData) {
+      return "Location not available"
+    }
+
+    // Check if it's the new format with address
+    if (locationData.address) {
+      return locationData.address
+    }
+
+    // Check if it's old format with latitude/longitude
+    if (locationData.latitude && locationData.longitude) {
+      return `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`
+    }
+
+    // Check if there's a note
+    if (locationData.note) {
+      return locationData.note
+    }
+
+    return "Location not available"
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -205,6 +229,9 @@ function AdminDashboard() {
                     Location
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Photo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -239,20 +266,37 @@ function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {attendance ? attendance.time : "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-500">
                         {attendance && attendance.location ? (
-                          attendance.location.latitude ? (
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 text-gray-400 mr-1" />
-                              <span className="truncate max-w-[150px]">
-                                {attendance.location.latitude.toFixed(6)}, {attendance.location.longitude.toFixed(6)}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic">No location data</span>
-                          )
+                          <div className="flex items-start">
+                            <MapPin className="h-4 w-4 text-gray-400 mr-1 mt-0.5 flex-shrink-0" />
+                            <span className="max-w-[200px] break-words">{getLocationDisplay(attendance.location)}</span>
+                          </div>
                         ) : (
-                          "-"
+                          <span className="text-gray-400 italic">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {attendance && attendance.image ? (
+                          <img
+                            src={attendance.image || "/placeholder.svg"}
+                            alt="Attendance"
+                            className="h-12 w-12 object-cover rounded-md cursor-pointer hover:scale-110 transition-transform"
+                            onClick={() => {
+                              // Open image in new tab for full view
+                              const newWindow = window.open()
+                              newWindow.document.write(`
+                                <html>
+                                  <head><title>Attendance Photo - ${employee.name}</title></head>
+                                  <body style="margin:0; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f3f4f6;">
+                                    <img src="${attendance.image}" style="max-width:100%; max-height:100%; object-fit:contain;" alt="Attendance Photo" />
+                                  </body>
+                                </html>
+                              `)
+                            }}
+                          />
+                        ) : (
+                          <span className="text-gray-400 italic">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
